@@ -1,19 +1,24 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
-const Admin = require('../models/Admin');
-const authMiddleware = require('../middleware/auth');
 
-router.post('/login', async (req, res) => {
+router.post('/login', (req, res) => {
   const { email, password } = req.body;
-  const admin = await Admin.findOne({ email });
-  if (!admin || !(await admin.matchPassword(password)))
-    return res.status(401).json({ message: 'Invalid credentials' });
-  const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, email: admin.email });
+  if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
+    const token = jwt.sign({ id: 'admin' }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    return res.json({ token, email });
+  }
+  res.status(401).json({ message: 'Invalid credentials' });
 });
 
-router.get('/me', authMiddleware, (req, res) => {
-  res.json({ email: req.admin.email });
+router.get('/me', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No token' });
+  try {
+    jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    res.json({ email: process.env.ADMIN_EMAIL });
+  } catch {
+    res.status(401).json({ message: 'Invalid token' });
+  }
 });
 
 module.exports = router;
